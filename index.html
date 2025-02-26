@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>直线与圆的位置关系互动演示</title>
+    <style>
+        canvas {
+            border: 1px solid #999;
+            background: #f8f8f8;
+        }
+        .controls {
+            margin: 15px 0;
+        }
+        button {
+            padding: 8px 20px;
+            margin: 0 5px;
+            cursor: pointer;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        #status {
+            margin-top: 15px;
+            font-family: Arial, sans-serif;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <button onclick="adjustRadius(5)">放大圆</button>
+        <button onclick="adjustRadius(-5)">缩小圆</button>
+    </div>
+    <canvas id="canvas" width="800" height="500"></canvas>
+    <div id="status">状态信息加载中...</div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const fixedLineY = 250;  // 固定水平直线的Y坐标
+        
+        let circle = {
+            x: 400,        // 初始圆心X坐标
+            y: 300,        // 初始圆心Y坐标
+            radius: 35,    // 初始半径
+            dragging: false
+        };
+
+        // 鼠标事件监听
+        canvas.addEventListener('mousedown', startDrag);
+        canvas.addEventListener('mousemove', dragCircle);
+        canvas.addEventListener('mouseup', endDrag);
+        canvas.addEventListener('mouseleave', endDrag);
+
+        function startDrag(e) {
+            const pos = getMousePos(e);
+            if (distance(pos, circle) < 10) {
+                circle.dragging = true;
+            }
+        }
+
+        function dragCircle(e) {
+            if (!circle.dragging) return;
+            const pos = getMousePos(e);
+            circle.x = pos.x;
+            circle.y = pos.y;
+            updateCanvas();
+        }
+
+        function endDrag() {
+            circle.dragging = false;
+        }
+
+        // 半径调整函数
+        function adjustRadius(change) {
+            circle.radius = Math.max(5, circle.radius + change);
+            updateCanvas();
+        }
+
+        // 计算交点坐标
+        function calculateIntersections() {
+            const distanceToLine = Math.abs(circle.y - fixedLineY);
+            const dx = Math.sqrt(circle.radius**2 - distanceToLine**2);
+            
+            if (distanceToLine > circle.radius) return [];
+            if (distanceToLine === circle.radius) return [[circle.x, fixedLineY]];
+            
+            return [
+                [circle.x - dx, fixedLineY],
+                [circle.x + dx, fixedLineY]
+            ];
+        }
+
+        // 绘图函数
+        function updateCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 绘制固定直线
+            ctx.beginPath();
+            ctx.moveTo(0, fixedLineY);
+            ctx.lineTo(canvas.width, fixedLineY);
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 绘制距离指示线
+            ctx.beginPath();
+            ctx.moveTo(circle.x, circle.y);
+            ctx.lineTo(circle.x, fixedLineY);
+            ctx.setLineDash([5, 3]);
+            ctx.strokeStyle = '#666';
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 绘制圆形
+            ctx.beginPath();
+            ctx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(66, 165, 245, 0.3)';
+            ctx.fill();
+            ctx.strokeStyle = '#1A237E';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 绘制圆心
+            ctx.beginPath();
+            ctx.arc(circle.x, circle.y, 4, 0, Math.PI * 2);
+            ctx.fillStyle = 'black';
+            ctx.fill();
+
+            // 绘制交点
+            const intersections = calculateIntersections();
+            ctx.fillStyle = '#E53935';
+            intersections.forEach(point => {
+                ctx.beginPath();
+                ctx.arc(point[0], point[1], 6, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // 更新状态信息
+            const statusText = `当前半径：${circle.radius} | 圆心到直线距离：${Math.abs(circle.y - fixedLineY).toFixed(1)} | 位置关系：${getRelationshipText(intersections.length)}`;
+            document.getElementById('status').textContent = statusText;
+        }
+
+        // 辅助函数
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        }
+
+        function distance(a, b) {
+            return Math.hypot(a.x - b.x, a.y - b.y);
+        }
+
+        function getRelationshipText(intersections) {
+            const d = Math.abs(circle.y - fixedLineY);
+            if (d > circle.radius) return "相离";
+            if (d === circle.radius) return "相切";
+            return `相交（${intersections}个交点）`;
+        }
+
+        // 初始化
+        updateCanvas();
+    </script>
+</body>
+</html>
