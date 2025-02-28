@@ -1,168 +1,191 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>直线与圆的位置关系互动演示</title>
     <style>
-        canvas {
-            border: 1px solid #999;
-            background: #f8f8f8;
-        }
-        .controls {
-            margin: 15px 0;
-        }
-        button {
-            padding: 8px 20px;
-            margin: 0 5px;
-            cursor: pointer;
-            background: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-        }
-        #status {
-            margin-top: 15px;
-            font-family: Arial, sans-serif;
-            color: #333;
+        canvas { border: 1px solid #ccc; }
+        .container { display: flex; gap: 20px; }
+        .controls { display: flex; flex-direction: column; gap: 10px; }
+        .table-container { min-width: 600px; }
+        table { border-collapse: collapse; margin-top: 10px; width: 100%; }
+        td, th { border: 1px solid #999; padding: 5px; text-align: center; }
+        .active { background-color: #4CAF50; color: white; }
+        /* 列宽优化 */
+        table td:not(:first-child) { width: 50px; }
+        table th[colspan] { background: #f0f0f0; }
+        /* 距离数值样式 */
+        .distance-label {
+            position: absolute;
+            background: white;
+            padding: 2px 5px;
+            transform: translate(10px, -50%);
         }
     </style>
 </head>
 <body>
-    <div class="controls">
-        <button onclick="adjustRadius(5)">放大圆</button>
-        <button onclick="adjustRadius(-5)">缩小圆</button>
+    <div class="container">
+        <div>
+            <canvas id="canvas" width="600" height="400"></canvas>
+            <div class="controls">
+                <div>
+                    <label>半径 r: <input type="number" id="radius" value="70"></label>
+                    <button onclick="changeRadius(5)">放大圆</button>
+                    <button onclick="changeRadius(-5)">缩小圆</button>
+                </div>
+                <div>
+                    <label>距离 d: <input type="number" id="distance"></label>
+                </div>
+            </div>
+        </div>
+        <div class="table-container">
+            <div>
+                <button onclick="showTable(1)" class="active">实验表格一</button>
+                <button onclick="showTable(2)">实验表格二</button>
+            </div>
+            <div id="tableContent"></div>
+        </div>
     </div>
-    <canvas id="canvas" width="800" height="500"></canvas>
-    <div id="status">状态信息加载中...</div>
 
-    <script>
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const fixedLineY = 250;  // 固定水平直线的Y坐标
-        
-        let circle = {
-            x: 400,        // 初始圆心X坐标
-            y: 300,        // 初始圆心Y坐标
-            radius: 35,    // 初始半径
-            dragging: false
-        };
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let isDragging = false;
+let cx = 300, cy = 200;
+let r = 70, d = Math.abs(cy - 200);
+const lineY = 200;
 
-        // 鼠标事件监听
-        canvas.addEventListener('mousedown', startDrag);
-        canvas.addEventListener('mousemove', dragCircle);
-        canvas.addEventListener('mouseup', endDrag);
-        canvas.addEventListener('mouseleave', endDrag);
+// 初始化
+document.getElementById('radius').value = r;
+document.getElementById('distance').value = d.toFixed(2);
 
-        function startDrag(e) {
-            const pos = getMousePos(e);
-            if (distance(pos, circle) < 10) {
-                circle.dragging = true;
-            }
-        }
+// 事件监听
+canvas.addEventListener('mousedown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    if (Math.hypot(x - cx, y - cy) < 10) isDragging = true;
+});
 
-        function dragCircle(e) {
-            if (!circle.dragging) return;
-            const pos = getMousePos(e);
-            circle.x = pos.x;
-            circle.y = pos.y;
-            updateCanvas();
-        }
+canvas.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    const rect = canvas.getBoundingClientRect();
+    cx = e.clientX - rect.left;
+    cy = e.clientY - rect.top;
+    d = Math.abs(cy - lineY);
+    document.getElementById('distance').value = d.toFixed(2);
+    draw();
+});
 
-        function endDrag() {
-            circle.dragging = false;
-        }
+canvas.addEventListener('mouseup', () => isDragging = false);
 
-        // 半径调整函数
-        function adjustRadius(change) {
-            circle.radius = Math.max(5, circle.radius + change);
-            updateCanvas();
-        }
+document.getElementById('radius').addEventListener('input', function() {
+    r = parseInt(this.value) || 70;
+    draw();
+});
 
-        // 计算交点坐标
-        function calculateIntersections() {
-            const distanceToLine = Math.abs(circle.y - fixedLineY);
-            const dx = Math.sqrt(circle.radius**2 - distanceToLine**2);
-            
-            if (distanceToLine > circle.radius) return [];
-            if (distanceToLine === circle.radius) return [[circle.x, fixedLineY]];
-            
-            return [
-                [circle.x - dx, fixedLineY],
-                [circle.x + dx, fixedLineY]
-            ];
-        }
+document.getElementById('distance').addEventListener('input', function() {
+    d = parseFloat(this.value) || 0;
+    cy = lineY + (cy > lineY ? d : -d);
+    draw();
+});
 
-        // 绘图函数
-        function updateCanvas() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // 绘制固定直线
-            ctx.beginPath();
-            ctx.moveTo(0, fixedLineY);
-            ctx.lineTo(canvas.width, fixedLineY);
-            ctx.strokeStyle = '#333';
-            ctx.lineWidth = 2;
-            ctx.stroke();
+// 绘图函数
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // 绘制直线
+    ctx.beginPath();
+    ctx.moveTo(0, lineY);
+    ctx.lineTo(canvas.width, lineY);
+    ctx.strokeStyle = '#000';
+    ctx.stroke();
 
-            // 绘制距离指示线
-            ctx.beginPath();
-            ctx.moveTo(circle.x, circle.y);
-            ctx.lineTo(circle.x, fixedLineY);
-            ctx.setLineDash([5, 3]);
-            ctx.strokeStyle = '#666';
-            ctx.stroke();
-            ctx.setLineDash([]);
+    // 绘制距离线段
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx, lineY);
+    ctx.setLineDash([5, 5]);
+    ctx.strokeStyle = '#666';
+    ctx.stroke();
+    ctx.setLineDash([]);
 
-            // 绘制圆形
-            ctx.beginPath();
-            ctx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(66, 165, 245, 0.3)';
-            ctx.fill();
-            ctx.strokeStyle = '#1A237E';
-            ctx.lineWidth = 2;
-            ctx.stroke();
+    // 绘制距离数值
+    ctx.fillStyle = '#000';
+    ctx.font = '12px Arial';
+    ctx.fillText(d.toFixed(2), cx + 10, (cy + lineY)/2);
 
-            // 绘制圆心
-            ctx.beginPath();
-            ctx.arc(circle.x, circle.y, 4, 0, Math.PI * 2);
-            ctx.fillStyle = 'black';
-            ctx.fill();
+    // 绘制圆
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,0,0,0.2)';
+    ctx.fill();
+    ctx.strokeStyle = '#f00';
+    ctx.stroke();
 
-            // 绘制交点
-            const intersections = calculateIntersections();
-            ctx.fillStyle = '#E53935';
-            intersections.forEach(point => {
-                ctx.beginPath();
-                ctx.arc(point[0], point[1], 6, 0, Math.PI * 2);
-                ctx.fill();
-            });
+    // 绘制圆心
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#000';
+    ctx.fill();
 
-            // 更新状态信息
-            const statusText = `当前半径：${circle.radius} | 圆心到直线距离：${Math.abs(circle.y - fixedLineY).toFixed(1)} | 位置关系：${getRelationshipText(intersections.length)}`;
-            document.getElementById('status').textContent = statusText;
-        }
+    // 计算并绘制交点
+    let distance = Math.abs(cy - lineY);
+    if (Math.abs(distance - r) < 1) distance = r;
+    if (distance <= r) {
+        const dx = Math.sqrt(r**2 - distance**2);
+        ctx.fillStyle = '#00f';
+        ctx.beginPath();
+        ctx.arc(cx + dx, lineY, 3, 0, Math.PI * 2);
+        ctx.arc(cx - dx, lineY, 3, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
 
-        // 辅助函数
-        function getMousePos(e) {
-            const rect = canvas.getBoundingClientRect();
-            return {
-                x: e.clientX - rect.left,
-                y: e.clientY - rect.top
-            };
-        }
+// 半径调整
+function changeRadius(delta) {
+    r = Math.max(10, r + delta);
+    document.getElementById('radius').value = r;
+    draw();
+}
 
-        function distance(a, b) {
-            return Math.hypot(a.x - b.x, a.y - b.y);
-        }
+// 表格功能
+function showTable(type) {
+    document.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    const container = document.getElementById('tableContent');
+    container.innerHTML = '';
 
-        function getRelationshipText(intersections) {
-            const d = Math.abs(circle.y - fixedLineY);
-            if (d > circle.radius) return "相离";
-            if (d === circle.radius) return "相切";
-            return `相交（${intersections}个交点）`;
-        }
+    if (type === 1) {
+        const numbers = Array.from({length:5}, () => Math.floor(Math.random()*49 +51));
+        container.innerHTML = `
+            <table>
+                <tr><th colspan="6">探究相切时，r与d的数量关系实验记录表</th></tr>
+                <tr><td>半径r</td>${numbers.map(n=>`<td>${n}</td>`).join('')}</tr>
+                <tr><td>距离d</td>${Array(5).fill('<td><input type="number"></td>').join('')}</tr>
+            </table>`;
+    } else {
+        const r = Math.floor(Math.random()*60 +20);
+        const left = Array.from({length:4}, (_,i) => Math.floor(r*(i+1)/5)).sort((a,b)=>a-b);
+        const right = Array.from({length:4}, (_,i) => Math.floor(r + (99-r)*(i+1)/5)).sort((a,b)=>a-b);
+        container.innerHTML = `
+            <table>
+                <tr><th colspan="10">半径一定时，探究d和圆与直线位置关系的实验记录表</th></tr>
+                <tr><td colspan="10" style="text-align:left">半径r=${r}</td></tr>
+                <tr><td>d</td>${left.map(n=>`<td>${n}</td>`).join('')}<td>${r}</td>${right.map(n=>`<td>${n}</td>`).join('')}</tr>
+                <tr><td>交点个数</td>${Array(9).fill('<td><input type="number"></td>').join('')}</tr>
+                <tr><td>位置关系</td>${Array(9).fill(`<td>
+                    <select>
+                        <option>相交</option>
+                        <option>相切</option>
+                        <option>相离</option>
+                    </select>
+                </td>`).join('')}</tr>
+            </table>`;
+    }
+}
 
-        // 初始化
-        updateCanvas();
-    </script>
+// 初始绘制
+draw();
+showTable(1);
+</script>
 </body>
 </html>
