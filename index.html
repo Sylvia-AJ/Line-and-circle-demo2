@@ -5,21 +5,24 @@
         canvas { border: 1px solid #ccc; }
         .container { display: flex; gap: 20px; }
         .controls { display: flex; flex-direction: column; gap: 10px; }
-        .table-container { min-width: 600px; }
-        table { border-collapse: collapse; margin-top: 10px; width: 100%; }
-        td, th { border: 1px solid #999; padding: 5px; text-align: center; }
+        .table-container { min-width: 1000px; }
+        table { border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
+        td, th { border: 1px solid #999; padding: 5px; text-align: center; width: 20ch; }
         .active { background-color: #4CAF50; color: white; }
-        /* 列宽优化 */
-        table td:not(:first-child) { width: 50px; }
-        table th[colspan] { background: #f0f0f0; }
-        /* 距离数值样式 */
-        .distance-label {
-            position: absolute;
-            background: white;
-            padding: 2px 5px;
-            transform: translate(10px, -50%);
+        .demo-btn { 
+            margin: 2px; 
+            width: 15ch;
+            padding: 3px 6px;
         }
-    </style>
+        .radius-cell { background-color: rgba(173,216,230,0.3); }
+        .blue-text { color: blue; font-weight: bold; }
+        .red-text { color: red; font-weight: bold; }
+        .bold-text { font-weight: bold; }
+        /* 新增按钮行样式 */
+        .button-row td {
+            padding: 8px 3px;
+            background-color: #f5f5f5;
+        }    </style>
 </head>
 <body>
     <div class="container">
@@ -40,6 +43,7 @@
             <div>
                 <button onclick="showTable(1)" class="active">实验表格一</button>
                 <button onclick="showTable(2)">实验表格二</button>
+                <button onclick="resetTable()">重置</button>
             </div>
             <div id="tableContent"></div>
         </div>
@@ -52,6 +56,8 @@ let isDragging = false;
 let cx = 300, cy = 200;
 let r = 70, d = Math.abs(cy - 200);
 const lineY = 200;
+let currentTableType = 1;
+let tableData = {};
 
 // 初始化
 document.getElementById('radius').value = r;
@@ -78,7 +84,8 @@ canvas.addEventListener('mousemove', (e) => {
 canvas.addEventListener('mouseup', () => isDragging = false);
 
 document.getElementById('radius').addEventListener('input', function() {
-    r = parseInt(this.value) || 70;
+    r = Math.max(10, parseInt(this.value) || 70);
+    this.value = r;
     draw();
 });
 
@@ -114,6 +121,8 @@ function draw() {
     ctx.fillText(d.toFixed(2), cx + 10, (cy + lineY)/2);
 
     // 绘制圆
+    let distance = Math.abs(cy - lineY);
+    if (Math.abs(distance - r) < 1) distance = r;
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(255,0,0,0.2)';
@@ -127,9 +136,7 @@ function draw() {
     ctx.fillStyle = '#000';
     ctx.fill();
 
-    // 计算并绘制交点
-    let distance = Math.abs(cy - lineY);
-    if (Math.abs(distance - r) < 1) distance = r;
+    // 绘制交点
     if (distance <= r) {
         const dx = Math.sqrt(r**2 - distance**2);
         ctx.fillStyle = '#00f';
@@ -146,41 +153,172 @@ function changeRadius(delta) {
     document.getElementById('radius').value = r;
     draw();
 }
-
-// 表格功能
-function showTable(type) {
+// 新增生成不重复随机数的工具函数
+function generateUniqueNumbers(min, max, count) {
+    const numbers = new Set();
+    while(numbers.size < count) {
+        numbers.add(Math.floor(Math.random() * (max - min + 1)) + min);
+    }
+    return Array.from(numbers).sort((a, b) => a - b);
+}
+// 修改后的showTable函数
+function showTable(type, forceRefresh = false) {
+    currentTableType = type;
     document.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
     event.target.classList.add('active');
     const container = document.getElementById('tableContent');
-    container.innerHTML = '';
-
+    
     if (type === 1) {
-        const numbers = Array.from({length:5}, () => Math.floor(Math.random()*49 +51));
-        container.innerHTML = `
-            <table>
-                <tr><th colspan="6">探究相切时，r与d的数量关系实验记录表</th></tr>
-                <tr><td>半径r</td>${numbers.map(n=>`<td>${n}</td>`).join('')}</tr>
-                <tr><td>距离d</td>${Array(5).fill('<td><input type="number"></td>').join('')}</tr>
-            </table>`;
+        if (!tableData.table1 || forceRefresh) {
+            tableData.table1 = {
+                // 生成5个不重复的51-99之间的整数
+                radius: generateUniqueNumbers(51, 99, 5)
+            };
+        }
+        renderTable1();
     } else {
-        const r = Math.floor(Math.random()*60 +20);
-        const left = Array.from({length:4}, (_,i) => Math.floor(r*(i+1)/5)).sort((a,b)=>a-b);
-        const right = Array.from({length:4}, (_,i) => Math.floor(r + (99-r)*(i+1)/5)).sort((a,b)=>a-b);
-        container.innerHTML = `
-            <table>
-                <tr><th colspan="10">半径一定时，探究d和圆与直线位置关系的实验记录表</th></tr>
-                <tr><td colspan="10" style="text-align:left">半径r=${r}</td></tr>
-                <tr><td>d</td>${left.map(n=>`<td>${n}</td>`).join('')}<td>${r}</td>${right.map(n=>`<td>${n}</td>`).join('')}</tr>
-                <tr><td>交点个数</td>${Array(9).fill('<td><input type="number"></td>').join('')}</tr>
-                <tr><td>位置关系</td>${Array(9).fill(`<td>
-                    <select>
-                        <option>相交</option>
-                        <option>相切</option>
-                        <option>相离</option>
-                    </select>
-                </td>`).join('')}</tr>
-            </table>`;
+        if (!tableData.table2 || forceRefresh) {
+            const radius = Math.floor(Math.random()*60 +20);
+            // 生成左侧数据（4个不重复且小于半径的数）
+            const leftNumbers = generateUniqueNumbers(1, radius-1, 4);
+            // 生成右侧数据（4个不重复且大于半径的数）
+            const rightNumbers = generateUniqueNumbers(radius+1, 99, 4);
+            
+            tableData.table2 = {
+                radius,
+                d: {
+                    left: leftNumbers,
+                    right: rightNumbers
+                }
+            };
+        }
+        renderTable2();
     }
+}
+function resetTable() {
+    showTable(currentTableType, true);
+}
+
+function renderTable1() {
+    const container = document.getElementById('tableContent');
+    const data = tableData.table1;
+    
+    let html = `
+        <table>
+            <tr><th colspan="6">探究相切时，r与d的数量关系实验记录表</th></tr>
+            <tr><td>半径r</td>${data.radius.map(n=>`<td>${n}</td>`).join('')}</tr>
+            <tr><td>距离d</td>${data.radius.map((_,i)=>`
+                <td><input type="number" id="d${i}"></td>`).join('')}
+            </tr>
+            <tr class="button-row"><td></td>
+                ${data.radius.map((_,i)=>`
+                    <td><button class="demo-btn" onclick="demoTable1(${i})">演示</button></td>
+                `).join('')}
+            </tr>
+        </table>`;
+    
+    container.innerHTML = html;
+}
+
+function renderTable2() {
+    const container = document.getElementById('tableContent');
+    const data = tableData.table2;
+    const fullD = [...data.d.left, data.radius, ...data.d.right];
+    
+    let html = `
+        <table>
+            <tr><th colspan="10">半径一定时，探究d和圆与直线位置关系的实验记录表</th></tr>
+            <tr><td colspan="10" style="text-align:left; font-weight:bold; color:red">半径r=${data.radius}</td></tr>
+            <tr><td>d</td>${data.d.left.map(n=>`<td>${n}</td>`).join('')}
+                <td class="radius-cell">${data.radius}</td>
+                ${data.d.right.map(n=>`<td>${n}</td>`).join('')}
+            </tr>
+            <tr><td>位置关系</td>${fullD.map((d,i)=>`
+                <td><span id="relation${i}"></span></td>`).join('')}
+            </tr>
+            <tr class="button-row"><td></td>
+                ${fullD.map((_,i)=>`
+                    <td><button class="demo-btn" onclick="demoTable2(${i})">演示</button></td>
+                `).join('')}
+            </tr>
+        </table>`;
+    
+    container.innerHTML = html;
+}
+// 演示功能
+function animateValue(start, end, setter) {
+    const duration = 500;
+    const startTime = Date.now();
+    const step = () => {
+        const progress = Math.min(1, (Date.now() - startTime) / duration);
+        setter(start + (end - start) * progress);
+        if (progress < 1) requestAnimationFrame(step);
+        else setter(end);
+    };
+    requestAnimationFrame(step);
+}
+
+function demoTable1(index) {
+    const targetR = tableData.table1.radius[index];
+    const currentR = r;
+    const currentD = cy - lineY;
+    
+    animateValue(currentR, targetR, val => {
+        r = Math.round(val);
+        document.getElementById('radius').value = r;
+        draw();
+    });
+    
+    setTimeout(() => {
+        animateValue(currentD, targetR, val => {
+            cy = lineY + val;
+            d = Math.abs(val);
+            document.getElementById('distance').value = d.toFixed(2);
+            draw();
+        });
+    }, 500);
+    
+    setTimeout(() => {
+        document.querySelectorAll(`#d${index}`)[0].value = targetR.toFixed(2);
+        document.querySelectorAll(`#d${index}`)[0].classList.add('blue-text');
+    }, 1000);
+}
+
+function demoTable2(index) {
+    const data = tableData.table2;
+    const fullD = [...data.d.left, data.radius, ...data.d.right];
+    const targetD = fullD[index];
+    const currentR = r;
+    const currentD = cy - lineY;
+    
+    animateValue(currentR, data.radius, val => {
+        r = Math.round(val);
+        document.getElementById('radius').value = r;
+        draw();
+    });
+    
+    setTimeout(() => {
+        animateValue(currentD, targetD, val => {
+            cy = lineY + val;
+            d = Math.abs(val);
+            document.getElementById('distance').value = d.toFixed(2);
+            draw();
+        });
+    }, 500);
+    
+    setTimeout(() => {
+        let relation;
+        if (targetD < r) relation = '相交';
+        else if (targetD > r) relation = '相离';
+        else relation = '相切';
+        
+        const cell = document.getElementById(`relation${index}`);
+        cell.textContent = relation;
+        cell.className = '';
+        if (index < 4) cell.classList.add('blue-text');
+        else if (index > 4) cell.classList.add('red-text');
+        else cell.classList.add('bold-text');
+    }, 1000);
 }
 
 // 初始绘制
